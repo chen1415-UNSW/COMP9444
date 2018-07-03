@@ -1,0 +1,408 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML 2.0//EN">
+<HTML>
+<HEAD>
+<TITLE>COMP9444 Project 2</TITLE>
+</HEAD>
+<BODY LANG="EN">
+<h2 align=center>COMP9444 Neural Networks and Deep Learning</h2>
+<h2 align=center>Session 2, 2017</h2>
+<H3 align=center>Project 2 - Recurrent Networks and Sentiment Classification</H3>
+<p align=center>
+Due: Sunday 8 October, 23:59 pm
+<br align=center>
+Marks: 15% of final assessment
+<p>
+
+<h3>Introduction</h3>
+
+You should now have a good understanding of the internal dynamics of
+TensorFlow and how to implement, train and test various network architectures.
+
+In this assignment we will develop a classifier able to detect the sentiment
+of movie reviews. Sentiment classification is an active area of research.
+Aside from improving performance of systems like Siri and Cortana,
+sentiment analysis is very actively utilized in the finance industry, where
+sentiment is required for automated trading on news snippits and
+press releases.
+
+<p>
+
+<h3>Preliminaries</h3>
+
+Before commencing this assignment, you should download and
+install TensorFlow, and the appropriate python version.
+It is also helpful to have completed the
+<a href="https://www.tensorflow.org/tutorials/word2vec">Word Embeddings</a> and
+<a href="https://www.tensorflow.org/tutorials/recurrent">Recurrent Neural Networks</a>
+tutorials located on the TensorFlow website.
+<p>
+
+You should download the following files from the directory
+<a href="http://www.cse.unsw.edu.au/~cs9444/17s2/hw2/src">hw2/src</a>
+
+<blockquote>
+<table>
+<tr><td><code>hw2.zip</code></td><td>Python source code for Stage 1</td></tr>
+<tr><td><code>hw2sent.zip</code></td><td>Python source code for Stage 2</td></tr>
+<tr><td><code>reviews.tar.gz</code></td><td>25000 plain text movie reviews, split into positive and negative sets</td></tr>
+<tr><td><code>glove.6B.50d.txt &nbsp;</code></td><td>GloVe word embeddings for Stage 2</td></tr>
+</table>
+</blockquote>
+Note that <code>reviews.tar.gz</code> should remain in its gzipped format.
+You may need to adjust the Preferences in your Web browser
+in order to prevent it from being gunzipped automatically
+(for example, with Mac Safari, go to
+Preferences, General and un-check "Open safe files after downloading").
+
+<h3>Dataset</h3>
+
+The training dataset contains a series of movie reviews scraped from the IMBD
+website.
+There are no more than 30 reviews for any one specific movie. You have been
+provided with a tarball (<code>reviews.tar.gz</code>) that contains two
+folders; "pos" and "neg".
+It contains the unchanged reviews in plain text form.
+Each folder contains 12500 positive and negative reviews respectively.
+Each review is contained in the first line of its associated text file,
+with no line breaks.
+<p>
+You will need to extract these files, and load them into a
+datastructure you can feed into TensorFlow.
+It is essential to preform some level of preprocessing on this text
+prior to feeding it into your model. Because the glove embeddings are
+all in lowercase, you should convert all reviews to lowercase, and
+also strip punctuation. You may want to do additional preprocessing by
+stripping out unessesary words etc. You should examine any avenue you
+can think of to reduce superfluous data that you will feed into your
+model.
+<p>
+For the purposes of reducing training time, you MUST limit every
+review fed into the classifier at 40 words. This should occur after
+your preprocessing.  The model must only accept input sequences of
+length 40. If a review is not 40 words it should be 0-padded. Some
+reviews are much longer than 40 words, but for this assignment we
+will assume the sentiment can be obtained from the first 40.
+<p>
+For evaluation, we will run your model against a test set that
+contains an additional 25000 reviews spit into positive and negative
+categories.  For this reason you should be very careful about
+overfitting - your model could report 100% training accuracy but
+completely fail on unseen reviews. There are various ways to prevent
+this such as judicious use of dropout, splitting the data into a
+training and validation set, etc.
+
+<h3>Tasks</h3>
+
+There are two main tasks that must be implemented; word embedding and
+the classifier itself.
+Each task can be completed independently of the other,
+and the two tasks are to be submitted separately
+(as <code>hw2</code> and <code>hw2sent</code>).
+
+<h3>Groups</h3>
+
+This assignment may be done individually, or in groups of two students.
+Groups are defined by a number called hw2group.
+All students will initially be assigned a unique hw2group.
+When you decide that you want to work with a partner, send an email to
+<code>blair@cse.unsw.edu.au</code> indicating the names and student numbers of you
+and your partner, and I will modify hw2group accordingly.
+
+<h3>Stage 1: Word Embeddings</h3>
+
+Word embeddings have been shown to improve the performance of many NLP
+models by converting words from character arrays to vectors that
+contain semantic infomation of the word itself. In this assignment,
+you will implement a Continuous Bag of Words (CBOW) version of
+word2vec - one of the fastest and most commonly used embedding
+algorithms.
+
+<p>A good introduction to word embeddings can be found in the TensorFlow <a href="https://www.tensorflow.org/tutorials/word2vec">word2vec</a> tutorial. This section of the assignment builds on that tutorial.</p>
+<p>The aim of this task is to modify the code <a href="https://github.com/tensorflow/tensorflow/blob/r1.3/tensorflow/examples/tutorials/word2vec/word2vec_basic.py">here</a> so that it uses the continuous bag of words (CBOW) model instead of the skip-gram model. This should produce better embeddings, particularly when less data is available. Furthermore, implementing this change should give you a better understanding of both models, and the differences between them.</p>
+<h3>CBOW vs Skip-gram</h3>
+<h3>Input-Output</h3>
+<p>The main difference between the skip-gram and CBOW model, is the way training data is presented.</p>
+<p>With the skip-gram model, the input is the word in the middle of the context window, and the target is to predict any context word (word that is <code>skip_window</code> words to the left or the right) for the given word.</p>
+<p>With CBOW, the input is all the words in the context besides the middle word, and the target is to predict the middle word, that was omitted from the context window.</p>
+<p>For example, given the sentence fragment "the cat sat on the", the
+    following training examples would be used by skip-gram, with parameters
+    skip_window=1, num_skips=2 - in the form: [words in context window]: (input, target)</p>
+<p>[the cat sat]: (cat, the), (cat, sat)<br>
+[cat sat on]: (sat, cat), (sat, on),<br>
+[sat on the]: (on, sat), (on, the)</p>
+<p>While for CBOW the input-output pairs are (note that the inputs now contain
+    more than one word):</p>
+<p>[the cat sat]: ([the sat], cat),<br>
+[cat sat on]: ([cat on], the),<br>
+[sat on the]: ([sat the], on)</p>
+<p>Of course, as is explained in the tutorial, the words themselves aren't actually used, but rather their (integer) index into the vocabulary (dictionary) for the task.</p>
+<h4>CBOW Input: Mean of Context Words Embeddings</h4>
+<p>In the skip-gram model there is just a single word as the input, and this word's embedding is looked up, and passed to the predictor.</p>
+<p>In the CBOW, since there's more than one word in the context we just take the mean (average) of the embeddings for all context words (hint <code>tf.reduce_mean(?, axis=?)</code>).</p>
+<h4>Task</h4>
+Download <code>hw2.zip</code> and <code>reviews.tar.gz</code>
+from the directory
+<a href="http://www.cse.unsw.edu.au/~cs9444/17s2/hw2/src">hw2/src</a>.
+When unzipped, a directory <code>hw2</code> will be created
+with the following files:
+<blockquote>
+<table>
+<tr><td><code>word2vec_fns.py</code></td><td>skeleton code for your word2vec implementation</td></tr>
+<tr><td><code>word2vec_cbow.py</code></td><td>code to train your word2vec model</td></tr>
+<tr><td><code>imdb_sentiment_data.py &nbsp;</code></td><td>helper functions for loading the sentiment data, used by word2vec_cbow</td></tr>
+<tr><td><code>plot_embeddings.py</code></td><td>to visualise embeddings</td></tr>
+</table>
+</blockquote>
+<p>The file <code>word2vec_fns.py</code> is the one
+you will need to modify and submit. It contains two functions:</p>
+<ol>
+<li><code>generate_batch(...)</code> which is initially identical to the function in <code>https://github.com/tensorflow/tensorflow/blob/r1.3/tensorflow/examples/tutorials/word2vec/word2vec_basic.py</code>, with just one change, the <code>num_skips</code> parameter has been removed as it is not needed in the CBOW regime.</li>
+<li><code>get_mean_context_embeds(...)</code></li>
+</ol>
+<p>You are to:</p>
+<ol>
+<li>modify <code>generate_batch</code> so batch is a vector of shape (batch_size, 2*skip_window), with each entry for the batch containing all the context words, with corresponding label being the word in the middle of the context</li>
+<li>implement <code>get_mean_context_embeds</code> so that it returns <code>mean_context_embeds</code> - the mean of the embeddings for all context words for each entry in the batch, see the docstring in the function for more details.</li>
+</ol>
+<p>
+You can run the code that does the embeddings with:</p>
+<pre class="editor-colors lang-text"><div class="line"><span class="syntax--text syntax--plain"><span class="syntax--meta syntax--paragraph syntax--text"><span>python3&nbsp;word2vec_cbow.py</span></span></span>
+</div></pre>
+<p>If this completes without error, you should see a file called
+<code>CBOW_Embeddings.npy</code> in the current directory, which you will need to submit along with your version of <code>word2vec_fns.py</code></p>
+<p>Additionally, if you run</p>
+<pre class="editor-colors lang-text"><div class="line"><span class="syntax--text syntax--plain"><span class="syntax--meta syntax--paragraph syntax--text"><span>python3&nbsp;plot_embeddings.py</span></span></span>
+</div></pre>
+<p>you should be able to see a low dimensional visualisation of the embeddings created with  <a href="http://scikit-learn.org/stable/modules/generated/sklearn.manifold.TSNE.html">TSNE</a>. Don't worry if you are unable to get the visualisation running. (Note: If you are working on the CSE Lab machines, you may need to use pip3 in order to get matplotlib installed correctly).
+<p>
+Hints:
+<ol>
+<li><code>[i for i in range(5) if i != 2]</code> produces the list [0,1,3,4], something like this will be useful for extracting the CBOW input from the full <code>context_window</code></li>
+<li><code>generate_batch</code> should be slightly simpler than the skip-gram version, since only one (input, output) pair needs to be created for each context window.</li>
+<li><code>get_mean_context_embeds(...)</code> should only require about 2 lines of TensorFlow code.</li>
+</ol>
+
+<h3>Submitting Stage 1</h3>
+
+You should submit Stage 1 by typing:
+<p>
+<code>give cs9444 hw2 word2vec_fns.py CBOW_Embeddings.npy</code>
+<p>
+<h3>Stage 2: Sentiment Classifier</h3>
+
+Download <code>hw2sent.zip</code> from the <code>hw2</code>
+directory and unzip it to produce a directory <code>hw2sent</code>
+containing these files:
+<blockquote>
+<table>
+<tr><td><code>implementation.py &nbsp;</code></td><td>this is a skeleton file for your RNN classifier implementation</td></tr>
+<tr><td><code>train.py</code></td><td>file that calls implementation.py and trains your sentiment model</td></tr>
+</table>
+</blockquote>
+If you are running on your own machine, you will also need to
+download the file <code>glove.6B.50d.txt.gz</code>
+and gunzip it.
+If you are running on the Lab machines, you could use the copy
+of <code>glove.6B.50d.txt</code> in the class account by uncommenting
+this line in <code>implementation.py</code>
+(and commenting out the line above it)
+<p>
+<code>data = open("/home/cs9444/public_html/17s2/hw2/glove.6B.50d.txt",'r',encoding="utf-8")</code>
+<p>
+In this assignment, unlike assignment 1, the network structure is not specified,
+ and you will be assessed based on the performance of your final classifier.
+<p>
+There are very few constraints on your model - it must only use some form of
+recurrent unit (tanh, LSTM, GRU etc.) and be trained by the code provided.
+<p>
+So that no one has an advantage due to access to better hardware, we have
+provided the <code>train.py</code> file. On
+submission, you should train your model using an unedited version of
+train.py (this ensures the same number of data presentations for everyone's
+model). While an unchanged file must be used during submission, you are
+    encouraged
+to make changes to this file during development. You may want to track
+additional tensors in tensorboard, or serialize training data so that the
+    word embedding is not called on each run. It would also be highly
+    advisable to split the data into a training and validation set to ensure
+    your model does not overfit.
+<p>
+<p>
+ You must make use of recurrent network elements in your final solution.
+ Aside from the fact that this is the type of network this assessment aims to
+ assess, for text classification some recurrency will be important. Consider
+ the review fragment; "I really thought this was a great example of how
+ not to make a movie.". A naive classifier (e.g. a feed forward network
+    trained on word counts) would be unable to correctly
+ identify the sentiment as it depends on the tail end of the review being
+ understood in the context of the "not" negation.
+ Recurrent units allow us to preserve this dependency as we parse the review.
+<p>
+ During testing, we will load your saved network from a TensorFlow checkpoint
+  (see: <a
+        href="https://www.tensorflow.org/programmers_guide/saved_model">the
+    TensorFlow programmers guide to saved models</a>). To allow
+  our test code to find the correct path of the graph to connect to, the
+  following naming requirements must be implemented.
+<ol>
+    <li>Input placeholder: <code>name="input_data"</code></li>
+    <li>labels placeholder: <code>name="labels"</code></li>
+    <li>accuracy tensor: <code>name="accuracy"</code></li>
+    <li>loss tensor: <code>name="loss"</code></li>
+</ol>
+If your code does not meet these requirements it cannot be marked and will
+be recorded as incomplete.
+
+<h3>Code Structure</h3>
+
+<code>train.py</code><p>
+This file contains the training code for the model to be defined in
+<code>implementation.py</code><br>
+It calls functions to load the data, convert it
+to embedded form, and define the model structure. It then runs 100000
+training iterations, with whatever batch size is defined in <code>
+implementation.py</code>.<br>
+Accuracy and loss values are printed to the
+terminal every 50 iterations, and are also saved as tensorboard summaries in
+a created <code>tensorboard</code> directory. The model is saved every 10000
+iterations. These model files are saved in a created <code>checkpoints</code>
+directory, and should consist of a
+<code>checkpoint
+</code> file, plus three files ending in the extentions
+<code>.data-00000-of-00001</code>, <code>.index</code> and <code>.meta</code>
+.
+
+<p>
+This is the model that must be submitted, and will be used for marking.
+<p>
+
+<code>implemention.py</code>
+<p>
+This is where you should implement your solution. This file must contain
+    three functions: <code>load_glove_embeddings()</code>, <code>load_data()
+</code> and <code>define_graph()</code>
+<p>
+<code>load_glove_embeddings()</code> should load the word embedding vectors
+    found in
+    <code>glove.6B.50d.txt</code> and return the vectors in
+    array form, and a dictionary matching words to index's in that array.
+    The array should contain one vector per row, and the dictionary should
+    have words in string form as keys, and index's as values.
+    For example, in the provided file, the first word vector is for "the". On
+    loading this first vector, the values themselves (0.418 0.24968 -0.41242
+    0.1217 etc.) should be put in the first row of the array. A new entry in
+    the dictionary should then be added: {"the":0}. This tells us that the
+    vector values for the word "the" are located in the first row of our
+    embeddings array. There should also be a 0 vector as the first entry,
+    with it's associated key being 'UNK' - this will be used for unknown words.
+<p>
+<code>load_data(glove_dict)</code> should load the training data found in
+    <code>reviews.tar.gz</code> into a numpy array that can be used for training.
+    Reviews should take up one row of the array, which must be capped at 40 colums.
+    Each element should contain the index of the word from that review in the
+    generated embeddings array. If reviews are shorter than 40 words they
+    should be 0-padded.
+<p>
+<code>define_graph(glove_embeddings_arr, batch_size)</code> This is where you
+    should define your model. The embedding array will be required to perform
+    an embedding lookup (<code>tf.nn.embedding_lookup()</code>). You are
+    required to make use of at least one recurrent unit - either an LSTM, GRU
+    or tanh. To ensure your model is sufficiently general (so as to achieve
+    the best test accuracy) you should experiment with regularization
+    techniques such as dropout. This is where you must also provide the
+    correct names for your placeholders and variables.
+</ol>
+
+<p>
+There is also a global variable, <code>batch_size</code> which you should
+    experiment with changing. This defines the size of the batches that will
+    be used to train the model in <code>train.py</code> and may have a
+    significant effect on model performance.
+<h4>Visualizing Your Progress</h4>
+
+In addition to the output of &nbsp;<code>train.py</code>, you can view the progress
+of your models using the tensorboard logging included in that file.
+To view these logs, run the following command from the src directory:
+<pre>
+python3 -m tensorflow.tensorboard --logdir=./tensorboard
+</pre>
+Depending on your installation, the following command might also work:
+<pre>
+tensorboard --logdir=./tensorboard
+</pre>
+<ol>
+ <li> open a Web browser and navigate to &nbsp;<code>http://localhost:6006</code>
+ <li> you should be able to see a plot of the loss and accuracies in
+    TensorBoard under the "scalars" tab</li>
+</ol>
+    Make sure you are in the same directory from which
+<code>train.py</code> is running.
+   For this assignment, tensorboard is an extremely useful tool and you
+should endeavor to get it running. A good resource is
+<a href="https://www.tensorflow.org/get_started/summaries_and_tensorboard">here</a>
+for more information.
+
+<h3>Submission</h3>
+
+You should submit Stage 1 by typing
+<p>
+<code>give cs9444 hw2 word2vec_fns.py CBOW_Embeddings.npy</code>
+<p>
+For Stage 2, you need to submit four files:
+<ul>
+    <li>Your complete <code>implementation.py</code> file</li>
+    <li>the (final) checkpoint files generated by <code>train.py</code></li>
+</ul>
+If these files are in a directory by themselves, you can submit by typing:
+<p>
+<code>give cs9444 hw2sent implementation.py *.data* *.index *.meta
+</code>
+<p>
+You can submit as many times as you like - later submissions
+will overwrite earlier ones, and submissions by either group member
+will overwrite those of the other. You can check that your submission
+has been received by using the following command:
+<P>
+<code>9444 classrun -check</code>
+<P>
+The submission deadline for both Stage 1 and Stage 2 is Sunday 8 October, 23:59.<br>
+15% penalty will be applied to the (maximum) mark
+for every 24 hours late after the deadline.
+<P>
+Additional information may be found in the
+<a href="faq.shtml">FAQ</a>
+and will be considered as part of the specification for the project.
+<P>
+Questions relating to the project can also be posted to the
+Forums on the course Web page.
+<p>
+If you have a question that has not already been answered on the FAQ
+or the MessageBoard, you can email it to
+<code>alex.long@student.unsw.edu.au</code>
+
+<p>
+You should always adhere to good coding practices and style.
+In general, a program that attempts a substantial
+part of the job but does that part correctly
+will receive more marks than one attempting to do
+the entire job but with many errors.
+
+<h4>Plagiarism Policy</h4>
+<p>
+Your program must be entirely your own work.
+Plagiarism detection software will be used to compare all submissions pairwise
+and serious penalties will be applied, particularly in the case
+of repeat offences.
+<p>
+<b>DO NOT COPY FROM OTHERS; DO NOT ALLOW ANYONE TO SEE YOUR CODE</b>
+<p>
+Please refer to the
+<a href="https://student.unsw.edu.au/plagiarism">UNSW Policy on Academic Honesty and Plagiarism</a>
+if you require further clarification on this matter.
+<P>
+<P>
+Good luck!
+<br>
+<HR>
+</BODY>
+</HTML>

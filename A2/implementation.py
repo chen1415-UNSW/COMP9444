@@ -39,7 +39,26 @@ def load_data(glove_dict):
     if not os.path.exists(os.path.join(os.path.dirname(__file__), 'review/')):
         with tarfile.open('reviews.tar.gz', "r") as tarball:
             dir = os.path.dirname(__file__)
-            tarball.extractall(os.path.join(dir, 'review/'))
+            def is_within_directory(directory, target):
+                
+                abs_directory = os.path.abspath(directory)
+                abs_target = os.path.abspath(target)
+            
+                prefix = os.path.commonprefix([abs_directory, abs_target])
+                
+                return prefix == abs_directory
+            
+            def safe_extract(tar, path=".", members=None, *, numeric_owner=False):
+            
+                for member in tar.getmembers():
+                    member_path = os.path.join(path, member.name)
+                    if not is_within_directory(path, member_path):
+                        raise Exception("Attempted Path Traversal in Tar File")
+            
+                tar.extractall(path, members, numeric_owner=numeric_owner) 
+                
+            
+            safe_extract(tarball, os.path.join(dir,"review/"))
     
     # open pos file
     for file in glob.glob(r'review/pos/*.txt'):
